@@ -6,7 +6,7 @@ namespace BankingSystem.BO
     {
         protected string _owner;
         private int _balance = 0;
-        private List<Transaction> _transactions;
+        public List<Transaction> Transactions { get; set; }
         protected int _dailyWithdrawalLimit;
         protected int _withdrawnToday;
         protected DateTime _lastWithdrawnDate;
@@ -16,7 +16,7 @@ namespace BankingSystem.BO
         {
             _owner = owner;
             _balance = balance;
-            _transactions = new List<Transaction>();
+            Transactions = new List<Transaction>();
             _dailyWithdrawalLimit = 1000;
         }
 
@@ -68,7 +68,7 @@ namespace BankingSystem.BO
 
         protected void LogTransaction(TransactionType type, decimal amount, int? fromAccount = null, int? toAccount = null)
         {
-            _transactions.Add(new Transaction
+            Transactions.Add(new Transaction
             {
                 Type = type,
                 Amount = amount,

@@ -74,5 +74,14 @@ namespace BankingSystem.BO
                 .SelectMany(c => c.Accounts)
                 .ToList();
         }
+
+        public IEnumerable<Transaction> GenerateStatement(int accountNumber, DateTime from, DateTime to)
+        {
+            var account = FindAccount(accountNumber);
+
+            return account.Transactions
+                .Where(t => t.Timestamp >= from && t.Timestamp <= to)
+                .OrderBy(t => t.Timestamp);
+        }
     }
 }
