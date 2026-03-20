@@ -54,6 +54,7 @@ namespace BankingSystem.BO
                 throw new DailyLimitExceededException();
 
             _balance -= amount;
+            _withdrawnToday += amount;
 
             LogTransaction(TransactionType.Withdraw, amount);
         }
