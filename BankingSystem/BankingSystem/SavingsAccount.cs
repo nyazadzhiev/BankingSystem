@@ -9,10 +9,12 @@
             _interestRate = interestRate;
         }
 
-        public void applyInterest()
+        public void ApplyInterest()
         {
             int balance = GetBalance();
             SetBalance(balance + (balance * _interestRate));
+
+            LogTransaction(TransactionType.Interest, _interestRate);
         }
     }
 }

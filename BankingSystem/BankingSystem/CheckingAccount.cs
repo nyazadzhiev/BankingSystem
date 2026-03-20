@@ -15,6 +15,8 @@
                 throw new Exception("Overdraft exceeded");
 
             SetBalance(newBalance);
+
+            LogTransaction(TransactionType.Withdraw, amount);
         }
     }
 }
