@@ -14,6 +14,11 @@
             if (newBalance < -_overdraftLimit)
                 throw new Exception("Overdraft exceeded");
 
+            ResetDailyLimit();
+
+            if (_withdrawnToday + amount > _dailyWithdrawalLimit)
+                throw new Exception(" daily limit exceeded");
+
             SetBalance(newBalance);
 
             LogTransaction(TransactionType.Withdraw, amount);

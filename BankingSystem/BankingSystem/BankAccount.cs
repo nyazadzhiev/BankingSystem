@@ -5,12 +5,16 @@
         protected string _owner;
         private int _balance = 0;
         private List<Transaction> _transactions;
+        protected int _dailyWithdrawalLimit;
+        protected int _withdrawnToday;
+        protected DateTime _lastWithdrawnDate;
 
         public BankAccount(string owner, int balance)
         {
             _owner = owner;
             _balance = balance;
             _transactions = new List<Transaction>();
+            _dailyWithdrawalLimit = 1000;
         }
 
         public int GetBalance()
@@ -41,6 +45,11 @@
             if (amount > this._balance)
                 throw new Exception(" insufficient funds");
 
+            ResetDailyLimit();
+
+            if(_withdrawnToday + amount > _dailyWithdrawalLimit)
+                throw new Exception(" daily limit exceeded");
+
             _balance -= amount;
 
             LogTransaction(TransactionType.Withdraw, amount);
@@ -64,6 +73,14 @@
                 ToAccount = toAccount,
                 ResultingBalance = _balance
             });
+        }
+
+        protected void ResetDailyLimit()
+        {
+            if (_lastWithdrawnDate.Date != DateTime.UtcNow.Date)
+            {
+                _withdrawnToday = 0;
+            }
         }
     }
 }
