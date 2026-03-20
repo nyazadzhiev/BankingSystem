@@ -1,4 +1,6 @@
-﻿namespace BankingSystem
+﻿using BankingSystem.Exceptions;
+
+namespace BankingSystem.BO
 {
     public class CheckingAccount : BankAccount
     {
@@ -12,12 +14,12 @@
         {
             int newBalance = GetBalance() - amount;
             if (newBalance < -_overdraftLimit)
-                throw new Exception("Overdraft exceeded");
+                throw new OverdraftLimitExceededException();
 
             ResetDailyLimit();
 
             if (_withdrawnToday + amount > _dailyWithdrawalLimit)
-                throw new Exception(" daily limit exceeded");
+                throw new DailyLimitExceededException();
 
             SetBalance(newBalance);
 

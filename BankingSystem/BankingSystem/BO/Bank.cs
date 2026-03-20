@@ -1,4 +1,4 @@
-﻿namespace BankingSystem
+﻿namespace BankingSystem.BO
 {
     public class Bank
     {

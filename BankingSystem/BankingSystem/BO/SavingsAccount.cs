@@ -1,4 +1,6 @@
-﻿namespace BankingSystem
+﻿using BankingSystem.Exceptions;
+
+namespace BankingSystem.BO
 {
     public class SavingsAccount : BankAccount
     {
@@ -14,10 +16,10 @@
         public void ApplyInterest()
         {
             int balance = GetBalance();
-            int newBalance = balance + (balance * _interestRate);
+            int newBalance = balance + balance * _interestRate;
 
             if (newBalance > _maxBalance)
-                throw new Exception("Max balance exceeded");
+                throw new OverdraftLimitExceededException();
 
             SetBalance(newBalance);
 

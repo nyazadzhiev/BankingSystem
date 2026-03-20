@@ -1,4 +1,6 @@
-﻿namespace BankingSystem
+﻿using BankingSystem.Exceptions;
+
+namespace BankingSystem.BO
 {
     public class BankAccount
     {
@@ -25,15 +27,15 @@
         public void SetBalance(int balance)
         {
             if (balance < 0)
-                throw new Exception(" invalid input");
+                throw new InsufficientFundsException();
 
             _balance = balance;
         }
 
         public void Deposit(int amount)
         {
-            if(amount <= 0)
-                throw new Exception(" invalid input");
+            if (amount <= 0)
+                throw new InvalidAmountException();
 
             _balance += amount;
 
@@ -42,13 +44,13 @@
 
         public virtual void Withdraw(int amount)
         {
-            if (amount > this._balance)
-                throw new Exception(" insufficient funds");
+            if (amount > _balance)
+                throw new InsufficientFundsException();
 
             ResetDailyLimit();
 
             if(_withdrawnToday + amount > _dailyWithdrawalLimit)
-                throw new Exception(" daily limit exceeded");
+                throw new DailyLimitExceededException();
 
             _balance -= amount;
 
