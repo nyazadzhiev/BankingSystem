@@ -11,8 +11,8 @@
 
         public void applyInterest()
         {
-            int balance = getBalance();
-            setBalance(balance + (balance * _interestRate));
+            int balance = GetBalance();
+            SetBalance(balance + (balance * _interestRate));
         }
     }
 }

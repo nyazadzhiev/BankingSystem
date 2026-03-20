@@ -11,12 +11,12 @@
             _balance = balance;
         }
 
-        public int getBalance()
+        public int GetBalance()
         {
             return _balance;
         }
 
-        public void setBalance(int balance)
+        public void SetBalance(int balance)
         {
             if (balance < 0)
                 throw new Exception(" invalid input");
@@ -32,7 +32,7 @@
             _balance += amount;
         }
 
-        public void Withdraw(int amount)
+        public virtual void Withdraw(int amount)
         {
             if (amount > this._balance)
                 throw new Exception(" insufficient funds");
