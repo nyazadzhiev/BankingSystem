@@ -5,6 +5,12 @@
         protected string _owner;
         private int _balance = 0;
 
+        public BankAccount(string owner, int balance)
+        {
+            _owner = owner;
+            _balance = balance;
+        }
+
         public int getBalance()
         {
             return _balance;

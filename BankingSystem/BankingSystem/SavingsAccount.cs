@@ -2,12 +2,17 @@
 {
     public class SavingsAccount : BankAccount
     {
-        private int interestRate;
+        private int _interestRate;
+
+        public SavingsAccount(string owner, int balance, int interestRate) : base(owner, balance)
+        {
+            _interestRate = interestRate;
+        }
 
         public void applyInterest()
         {
             int balance = getBalance();
-            setBalance(balance + (balance * interestRate));
+            setBalance(balance + (balance * _interestRate));
         }
     }
 }
