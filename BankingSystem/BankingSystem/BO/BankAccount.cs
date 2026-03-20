@@ -2,7 +2,7 @@
 
 namespace BankingSystem.BO
 {
-    public class BankAccount
+    public abstract class BankAccount
     {
         protected string _owner;
         private int _balance = 0;
@@ -10,6 +10,7 @@ namespace BankingSystem.BO
         protected int _dailyWithdrawalLimit;
         protected int _withdrawnToday;
         protected DateTime _lastWithdrawnDate;
+        public int AccountNumber { get; set; }
 
         public BankAccount(string owner, int balance)
         {

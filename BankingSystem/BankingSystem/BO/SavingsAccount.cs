@@ -13,17 +13,30 @@ namespace BankingSystem.BO
             _maxBalance = maxBalance;
         }
 
-        public void ApplyInterest()
+        public void ApplyInterest(CompoundingMode mode)
         {
-            int balance = GetBalance();
-            int newBalance = balance + balance * _interestRate;
+            double balance = GetBalance();
+            double interest = 0;
+
+            switch (mode)
+            {
+                case CompoundingMode.Monthly:
+                    interest = balance * (_interestRate / 12);
+                    break;
+
+                case CompoundingMode.Yearly:
+                    interest = balance * _interestRate;
+                    break;
+            }
+
+            double newBalance = balance + interest;
 
             if (newBalance > _maxBalance)
-                throw new OverdraftLimitExceededException();
+                throw new InsufficientFundsException();
 
-            SetBalance(newBalance);
+            SetBalance((int)newBalance);
 
-            LogTransaction(TransactionType.Interest, _interestRate);
+            LogTransaction(TransactionType.Interest, (int)interest);
         }
     }
 }
