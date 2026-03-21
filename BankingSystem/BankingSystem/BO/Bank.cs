@@ -4,84 +4,135 @@ namespace BankingSystem.BO
 {
     public class Bank
     {
-        private List<Customer> customers;
-        private int nextCustomerId;
-        private int nextAccountNumber;
+        private List<Customer> _customers;
+        private int _nextCustomerId;
+        private int _nextAccountNumber;
+        private readonly object _bankLock = new object();
+        public decimal WithdrawalFee { get; set; } = 0.50m;
 
         public Bank()
         {
-            customers = new List<Customer>();
-            nextCustomerId = 1;
-            nextAccountNumber = 1;
+            _customers = new List<Customer>();
+            _nextCustomerId = 1;
+            _nextAccountNumber = 1;
         }
 
-        public BankAccount OpenAccount(string owner, string type, int balance)
+        public BankAccount OpenAccount(string owner, string type, decimal initialBalance, params object[] parameters)
         {
-            var customer = customers.FirstOrDefault(c => c.Name == owner);
-            if (customer == null)
+            if (string.IsNullOrWhiteSpace(owner))
+                throw new ArgumentException("Owner name cannot be empty", nameof(owner));
+
+            if (initialBalance < 0)
+                throw new InvalidAmountException();
+
+            lock (_bankLock)
             {
-                customer = new Customer(nextCustomerId++, owner);
-                customers.Add(customer);
+                var customer = _customers.FirstOrDefault(c => c.Name == owner);
+                if (customer == null)
+                {
+                    customer = new Customer(_nextCustomerId++, owner);
+                    _customers.Add(customer);
+                }
+
+                BankAccount account = type.ToLower() switch
+                {
+                    "savings" when parameters.Length >= 2 =>
+                        new SavingsAccount(owner, customer.Id, initialBalance,
+                            Convert.ToDecimal(parameters[0]), Convert.ToDecimal(parameters[1])),
+
+                    "checking" when parameters.Length >= 1 =>
+                        new CheckingAccount(owner, customer.Id, initialBalance,
+                            Convert.ToDecimal(parameters[0])),
+
+                    _ => throw new ArgumentException($"Invalid account type '{type}' or missing parameters")
+                };
+
+                account.AccountNumber = _nextAccountNumber++;
+                customer.Accounts.Add(account);
+
+                return account;
             }
-
-            BankAccount? account = null;
-
-            if (type == "Savings")
-            {
-                account = new SavingsAccount(owner, balance, 1, 5000);
-                account.AccountNumber = nextAccountNumber++;
-            }
-            else if (type == "Checking")
-            {
-                account = new CheckingAccount(owner, balance, 500);
-                account.AccountNumber = nextAccountNumber++;
-            }
-
-
-            customer.Accounts.Add(account);
-
-            return account;
         }
 
         public void CloseAccount(int accountNumber)
         {
-            foreach (var customer in customers)
+            lock (_bankLock)
             {
-                var account = customer.Accounts
-                    .FirstOrDefault(a => a.AccountNumber == accountNumber);
-
-                if (account != null)
+                foreach (var customer in _customers)
                 {
-                    customer.Accounts.Remove(account);
-                    return;
-                }
-            }
+                    var account = customer.Accounts
+                        .FirstOrDefault(a => a.AccountNumber == accountNumber);
 
-            throw new AccountNotFoundException();
+                    if (account != null)
+                    {
+                        if (account.GetBalance() != 0)
+                            throw new InvalidOperationException("Cannot close account with non-zero balance");
+
+                        customer.Accounts.Remove(account);
+                        return;
+                    }
+                }
+
+                throw new AccountNotFoundException();
+            }
         }
 
         public BankAccount FindAccount(int accountNumber)
         {
-            return customers
-                .SelectMany(c => c.Accounts)
-                .FirstOrDefault(a => a.AccountNumber == accountNumber)
-                ?? throw new AccountNotFoundException();
+            lock (_bankLock)
+            {
+                var account = _customers
+                    .SelectMany(c => c.Accounts)
+                    .FirstOrDefault(a => a.AccountNumber == accountNumber);
+
+                if (account == null)
+                    throw new AccountNotFoundException();
+
+                return account;
+            }
         }
 
         public List<BankAccount> ListAccounts()
         {
-            return customers
-                .SelectMany(c => c.Accounts)
-                .ToList();
+            lock (_bankLock)
+            {
+                return _customers
+                    .SelectMany(c => c.Accounts)
+                    .ToList();
+            }
         }
 
         public IEnumerable<Transaction> GenerateStatement(int accountNumber, DateTime from, DateTime to)
         {
+            if (from > to)
+                throw new ArgumentException("From date must be before to date");
+
             var account = FindAccount(accountNumber);
 
-            return account.Transactions
-                .Where(t => t.Timestamp >= from && t.Timestamp <= to)
-                .OrderBy(t => t.Timestamp);
+            lock (account)
+            {
+                return account.Transactions
+                    .Where(t => t.Timestamp >= from && t.Timestamp <= to)
+                    .OrderBy(t => t.Timestamp)
+                    .ToList();
+            }
+        }
+
+        public Customer FindCustomer(int customerId)
+        {
+            lock (_bankLock)
+            {
+                return _customers.FirstOrDefault(c => c.Id == customerId)
+                    ?? throw new ArgumentException("Customer not found");
+            }
+        }
+
+        public IEnumerable<Customer> GetAllCustomers()
+        {
+            lock (_bankLock)
+            {
+                return _customers.ToList();
+            }
         }
     }
 }

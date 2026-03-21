@@ -5,85 +5,134 @@ namespace BankingSystem.BO
     public abstract class BankAccount
     {
         protected string _owner;
-        private int _balance = 0;
+        private decimal _balance = 0;
         public List<Transaction> Transactions { get; set; }
-        protected int _dailyWithdrawalLimit;
-        protected int _withdrawnToday;
+        protected decimal _dailyWithdrawalLimit;
+        protected decimal _withdrawnToday;
         protected DateTime _lastWithdrawnDate;
         public int AccountNumber { get; set; }
+        public int CustomerId { get; set; }
 
-        public BankAccount(string owner, int balance)
+        // Thread safety lock object
+        protected readonly object _balanceLock = new object();
+
+        public BankAccount(string owner, int customerId, decimal balance)
         {
             _owner = owner;
+            CustomerId = customerId;
             _balance = balance;
             Transactions = new List<Transaction>();
-            _dailyWithdrawalLimit = 1000;
+            _dailyWithdrawalLimit = 1000000;
+            _withdrawnToday = 0;
+            _lastWithdrawnDate = DateTime.UtcNow.Date;
         }
 
-        public int GetBalance()
+        public decimal GetBalance()
         {
-            return _balance;
+            lock (_balanceLock)
+            {
+                return _balance;
+            }
         }
 
-        public void SetBalance(int balance)
+        protected void SetBalance(decimal balance)
         {
-            if (balance < 0)
-                throw new InsufficientFundsException();
+            lock (_balanceLock)
+            {
+                if (balance < 0 && !CanHaveNegativeBalance())
+                    throw new InsufficientFundsException();
 
-            _balance = balance;
+                _balance = balance;
+            }
         }
 
-        public void Deposit(int amount)
+        protected virtual bool CanHaveNegativeBalance() => false;
+
+        public virtual void Deposit(decimal amount)
         {
             if (amount <= 0)
                 throw new InvalidAmountException();
 
-            _balance += amount;
-
-            LogTransaction(TransactionType.Deposit, amount);
-        }
-
-        public virtual void Withdraw(int amount)
-        {
-            if (amount > _balance)
-                throw new InsufficientFundsException();
-
-            ResetDailyLimit();
-
-            if(_withdrawnToday + amount > _dailyWithdrawalLimit)
-                throw new DailyLimitExceededException();
-
-            _balance -= amount;
-            _withdrawnToday += amount;
-
-            LogTransaction(TransactionType.Withdraw, amount);
-        }
-
-        public void TransferTo(BankAccount account, int amount)
-        { 
-            Withdraw(amount);
-            account.Deposit(amount);
-
-            LogTransaction(TransactionType.Transfer, amount);
-        }
-
-        protected void LogTransaction(TransactionType type, decimal amount, int? fromAccount = null, int? toAccount = null)
-        {
-            Transactions.Add(new Transaction
+            lock (_balanceLock)
             {
-                Type = type,
-                Amount = amount,
-                FromAccount = fromAccount,
-                ToAccount = toAccount,
-                ResultingBalance = _balance
-            });
+                _balance += amount;
+                LogTransaction(TransactionType.Deposit, amount);
+            }
         }
 
-        protected void ResetDailyLimit()
+        public virtual void Withdraw(decimal amount)
         {
-            if (_lastWithdrawnDate.Date != DateTime.UtcNow.Date)
+            if (amount <= 0)
+                throw new InvalidAmountException();
+
+            lock (_balanceLock)
+            {
+                ResetDailyLimit();
+
+                if (_withdrawnToday + amount > _dailyWithdrawalLimit)
+                    throw new DailyLimitExceededException();
+
+                if (_balance - amount < 0 && !CanHaveNegativeBalance())
+                    throw new InsufficientFundsException();
+
+                _balance -= amount;
+                _withdrawnToday += amount;
+                _lastWithdrawnDate = DateTime.UtcNow;
+
+                LogTransaction(TransactionType.Withdraw, amount);
+            }
+        }
+
+        public virtual void TransferTo(BankAccount account, decimal amount)
+        {
+            if (amount <= 0)
+                throw new InvalidAmountException();
+
+            lock (_balanceLock)
+            {
+                lock (account._balanceLock)
+                {
+                    if (!CanHaveNegativeBalance() && _balance - amount < 0)
+                        throw new InsufficientFundsException();
+
+                    ResetDailyLimit();
+                    if (_withdrawnToday + amount > _dailyWithdrawalLimit)
+                        throw new DailyLimitExceededException();
+
+                    _balance -= amount;
+                    _withdrawnToday += amount;
+                    _lastWithdrawnDate = DateTime.UtcNow;
+
+                    account._balance += amount;
+
+                    LogTransaction(TransactionType.Transfer, amount, account.AccountNumber);
+                    account.LogTransaction(TransactionType.Transfer, amount, null, AccountNumber);
+                }
+            }
+        }
+
+        protected virtual void ResetDailyLimit()
+        {
+            DateTime today = DateTime.UtcNow.Date;
+            if (_lastWithdrawnDate.Date != today)
             {
                 _withdrawnToday = 0;
+                _lastWithdrawnDate = today;
+            }
+        }
+
+        protected void LogTransaction(TransactionType type, decimal amount, int? toAccount = null, int? fromAccount = null)
+        {
+            lock (_balanceLock)
+            {
+                Transactions.Add(new Transaction
+                {
+                    Type = type,
+                    Amount = amount,
+                    FromAccount = fromAccount ?? (type == TransactionType.Withdraw ? AccountNumber : (int?)null),
+                    ToAccount = toAccount ?? (type == TransactionType.Deposit ? AccountNumber : (int?)null),
+                    ResultingBalance = _balance
+                });
             }
         }
     }

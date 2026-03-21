@@ -4,39 +4,76 @@ namespace BankingSystem.BO
 {
     public class SavingsAccount : BankAccount
     {
-        private int _interestRate;
-        private int _maxBalance;
+        private decimal _interestRatePercent;
+        private decimal _maxBalance;
+        private readonly object _interestLock = new object();
 
-        public SavingsAccount(string owner, int balance, int interestRate, int maxBalance) : base(owner, balance)
+        public SavingsAccount(string owner, int customerId, decimal balance, decimal interestRate, decimal maxBalance)
+            : base(owner, customerId, balance)
         {
-            _interestRate = interestRate;
+            _interestRatePercent = interestRate;
             _maxBalance = maxBalance;
+        }
+
+        protected override bool CanHaveNegativeBalance() => false;
+
+        public override void Withdraw(decimal amount)
+        {
+            lock (_balanceLock)
+            {
+                ResetDailyLimit();
+
+                if (_withdrawnToday + amount > _dailyWithdrawalLimit)
+                    throw new DailyLimitExceededException();
+
+                decimal currentBalance = GetBalance();
+                if (currentBalance - amount < 0)
+                    throw new InsufficientFundsException();
+
+                base.Withdraw(amount);
+            }
+        }
+
+        public override void Deposit(decimal amount)
+        {
+            lock (_balanceLock)
+            {
+                decimal currentBalance = GetBalance();
+                if (currentBalance + amount > _maxBalance)
+                    throw new MaxBalanceExceededException();
+
+                base.Deposit(amount);
+            }
         }
 
         public void ApplyInterest(CompoundingMode mode)
         {
-            double balance = GetBalance();
-            double interest = 0;
-
-            switch (mode)
+            lock (_interestLock)
             {
-                case CompoundingMode.Monthly:
-                    interest = balance * (_interestRate / 12);
-                    break;
+                lock (_balanceLock)
+                {
+                    decimal balance = GetBalance();
+                    decimal interest = 0;
 
-                case CompoundingMode.Yearly:
-                    interest = balance * _interestRate;
-                    break;
+                    switch (mode)
+                    {
+                        case CompoundingMode.Monthly:
+                            interest = Math.Round(balance * (_interestRatePercent / 12), 2);
+                            break;
+                        case CompoundingMode.Yearly:
+                            interest = Math.Round(balance * _interestRatePercent, 2);
+                            break;
+                    }
+
+                    decimal newBalance = balance + interest;
+
+                    if (newBalance > _maxBalance)
+                        throw new MaxBalanceExceededException();
+
+                    SetBalance(newBalance);
+                    LogTransaction(TransactionType.Interest, interest);
+                }
             }
-
-            double newBalance = balance + interest;
-
-            if (newBalance > _maxBalance)
-                throw new InsufficientFundsException();
-
-            SetBalance((int)newBalance);
-
-            LogTransaction(TransactionType.Interest, (int)interest);
         }
     }
 }
